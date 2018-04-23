@@ -20,6 +20,8 @@ type TestcaseReportInfo struct {
 	CoresStats      *ReportCoresInfo
 	// Apache benchmark type tests
 	ABStats *ApacheBenchmarkStats
+	// Latency type tests
+	LatStats *LatencyStats
 	// Per application statistics
 	Apps []RunningApp
 }
