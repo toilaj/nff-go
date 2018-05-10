@@ -11,8 +11,10 @@ import (
 	"time"
 )
 
-func (config *TestsuiteConfig) executeOneTest(test *TestConfig, logdir string,
+func (config *TestsuiteConfig) executeOneTest(index int, logdir string,
 	interrupt chan os.Signal) *TestcaseReportInfo {
+	test := config.Tests[index]
+
 	if test.TestTime < config.Config.RequestTimeout {
 		LogError("Test", test.Name, "duration", test.TestTime, "should be greater than docker http request timeout",
 			config.Config.RequestTimeout)
@@ -22,7 +24,6 @@ func (config *TestsuiteConfig) executeOneTest(test *TestConfig, logdir string,
 	}
 
 	LogInfo("/--- Running test", test.Name, "---")
-	LogInfo("Apps: ", test.Apps)
 
 	apps := make([]RunningApp, len(test.Apps))
 
@@ -39,7 +40,7 @@ func (config *TestsuiteConfig) executeOneTest(test *TestConfig, logdir string,
 		}
 
 		logger := NewLogger(file)
-		apps[iii].InitTest(logger, iii, &test.Apps[iii], &config.Config, test)
+		apps[iii].InitTest(logger, iii, &test.Apps[iii], &config.Config, &test)
 		err = apps[iii].startTest()
 		if err != nil {
 			LogError("Error running test application", &apps[iii], ":", err)
@@ -166,21 +167,8 @@ func (config *TestsuiteConfig) executeOneTest(test *TestConfig, logdir string,
 	}
 }
 
-func isTestInList(test *TestConfig, tl TestsList) bool {
-	if len(tl) == 0 {
-		return true
-	}
-
-	for iii := range tl {
-		if tl[iii].MatchString(test.Name) {
-			return true
-		}
-	}
-	return false
-}
-
 // RunAllTests launches all tests.
-func (config *TestsuiteConfig) RunAllTests(logdir string, tl TestsList) int {
+func (config *TestsuiteConfig) RunAllTests(logdir string) int {
 	report := StartReport(logdir)
 	if report == nil {
 		return 255
@@ -190,38 +178,31 @@ func (config *TestsuiteConfig) RunAllTests(logdir string, tl TestsList) int {
 	sichan := make(chan os.Signal, 1)
 	signal.Notify(sichan, os.Interrupt)
 
-	var totalTests, passedTests, failedTests []string
+	var totalTests, passedTests, failedTests int
 	for iii := range config.Tests {
-		test := &config.Tests[iii]
+		tr := config.executeOneTest(iii, logdir, sichan)
+		report.Pipe <- *tr
 
-		if isTestInList(test, tl) {
-			tr := config.executeOneTest(test, logdir, sichan)
-			report.Pipe <- *tr
+		totalTests++
+		if tr.Status == TestReportedPassed {
+			passedTests++
+		} else {
+			failedTests++
+		}
 
-			totalTests = append(totalTests, test.Name)
-			if tr.Status == TestReportedPassed {
-				passedTests = append(passedTests, test.Name)
-			} else {
-				failedTests = append(failedTests, test.Name)
-			}
-
-			if tr.Status == TestInterrupted {
-				break
-			}
+		if tr.Status == TestInterrupted {
+			break
 		}
 	}
 
 	report.FinishReport()
 
-	LogInfo("EXECUTED TEST NAMES:", totalTests)
-	LogInfo("PASSED TEST NAMES:", passedTests)
-	LogInfo("FAILED TEST NAMES:", failedTests)
-	LogInfo("TESTS EXECUTED:", len(totalTests))
-	LogInfo("PASSED:", len(passedTests))
-	LogInfo("FAILED:", len(failedTests))
+	LogInfo("TESTS EXECUTED:", totalTests)
+	LogInfo("PASSED:", passedTests)
+	LogInfo("FAILED:", failedTests)
 
-	if len(failedTests) > 0 {
-		return 100 + len(failedTests)
+	if failedTests > 0 {
+		return 100 + failedTests
 	} else {
 		return 0
 	}
