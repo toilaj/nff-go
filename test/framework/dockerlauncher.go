@@ -43,12 +43,12 @@ var (
 		regexp.MustCompile(`^Time per request: *(\d+\.\d+) \[ms\] \(mean, across all concurrent requests\)$`),
 		regexp.MustCompile(`^Transfer rate: *(\d+\.\d+) \[Kbytes/sec\] received$`),
 	}
-	LatencyStatsRegexps = [5]*regexp.Regexp{
+	LatStatsRegexps = [5]*regexp.Regexp{
 		regexp.MustCompile(`received\/sent= *(\d+\.?\d*) %$`),
 		regexp.MustCompile(`speed= *(\d+\.?\d*)$`),
-		regexp.MustCompile(`median= *(\d+\.?\d*) µs$`),
-		regexp.MustCompile(`average= *(\d+\.?\d*) µs$`),
-		regexp.MustCompile(`stddev= *(\d+\.?\d*) µs$`),
+		regexp.MustCompile(`median= *(\d+\.?\d*) μs$`),
+		regexp.MustCompile(`average= *(\d+\.?\d*) μs$`),
+		regexp.MustCompile(`stddev= *(\d+\.?\d*) μs$`),
 	}
 
 	NoDeleteContainersOnExit = false
@@ -187,8 +187,8 @@ func (app *RunningApp) testRoutine(report chan<- TestReport, done <-chan struct{
 				}
 			} else if app.config.Type == TestAppLatency {
 				// Get Latency perf test output
-				for iii := range LatencyStatsRegexps {
-					matches := LatencyStatsRegexps[iii].FindStringSubmatch(str)
+				for iii := range LatStatsRegexps {
+					matches := LatStatsRegexps[iii].FindStringSubmatch(str)
 					if len(matches) == 2 {
 						var value float32
 						n, err := fmt.Sscanf(matches[1], "%f", &value)
